@@ -796,9 +796,32 @@ namespace FlowMatters.Source.WebServer
                 fv.FullName = fn.FullName;
                 fv.Units = fn.ResultUnit.SIUnits;
                 fv.InitialValue = fn.InitialValue;
+                // Additive (SIFT A2): expose the function's time of evaluation as the flags-enum
+                // comma form. Read defensively via reflection because EvaluationTimes is absent on
+                // older Source versions this (legacy/WCF) branch also builds against.
+                fv.TimeOfEvaluation = ReflectString(fn, "EvaluationTimes");
                 result[i] = fv;
             }
             return result;
+        }
+
+        // Returns the string form of the first present property among `names`, else null.
+        // Lets us expose version-dependent members (e.g. a function's EvaluationTimes) without a
+        // hard compile-time dependency on properties that older Source versions do not have.
+        private static string ReflectString(object target, params string[] names)
+        {
+            if (target == null) return null;
+            Type type = target.GetType();
+            foreach (string name in names)
+            {
+                var prop = type.GetProperty(name);
+                if (prop != null)
+                {
+                    object val = prop.GetValue(target, null);
+                    return val?.ToString();
+                }
+            }
+            return null;
         }
 
         [OperationContract]
