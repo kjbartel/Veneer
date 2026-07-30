@@ -295,6 +295,7 @@
     <Compile Include="Tests\AddonLauncherIntegrationTests.cs" />
     <Compile Include="Tests\AddonScriptTests.cs" />
     <Compile Include="Tests\AddonValidationTests.cs" />
+    <Compile Include="Tests\AddonAssert.cs" />
     <Compile Include="ExchangeObjects\FunctionValue.cs" />
     <Compile Include="ExchangeObjects\InputSetSummary.cs" />
     <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />
