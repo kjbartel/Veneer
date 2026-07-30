@@ -199,6 +199,20 @@ namespace FlowMatters.Source.WebServerPanel
             }, null);
         }
 
+        /// <summary>
+        /// Log entry point for addon output, usable regardless of server state.
+        /// The LogBox sink is otherwise only wired up inside StartServer
+        /// (server.LogGenerator += ServerLogEvent), but addons can be launched with
+        /// the server stopped, so their output needs a path that does not depend on
+        /// it. ServerLogEvent itself never touches _server, and marshals to the UI
+        /// thread via _originalContext -- which is what OutputDataReceived, raised
+        /// on a threadpool thread, requires.
+        /// </summary>
+        internal void LogAddonMessage(string msg, LogLevel level)
+        {
+            ServerLogEvent(this, msg, level);
+        }
+
         private static System.Windows.Controls.ScrollViewer GetScrollViewer(System.Windows.DependencyObject depObj)
         {
             if (depObj is System.Windows.Controls.ScrollViewer sv) return sv;

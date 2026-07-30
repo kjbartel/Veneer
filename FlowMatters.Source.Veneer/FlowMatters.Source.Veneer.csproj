@@ -241,6 +241,11 @@
     <Compile Include="Addons\VeneerConfiguration.cs" />
     <Compile Include="CORS\EnableCrossOriginResourceSharingBehavior.cs" />
     <Compile Include="CORS\CORSMessageInspector.cs" />
+    <Compile Include="DomainActions\AddonCommandLine.cs" />
+    <Compile Include="DomainActions\AddonContext.cs" />
+    <Compile Include="DomainActions\AddonEnvironment.cs" />
+    <Compile Include="DomainActions\AddonLauncher.cs" />
+    <Compile Include="DomainActions\AddonScript.cs" />
     <Compile Include="DomainActions\InputSets.cs" />
     <Compile Include="DomainActions\ModelTabulator.cs" />
     <Compile Include="DomainActions\ScenarioInvoker.cs" />
@@ -285,6 +290,11 @@
     <Compile Include="Formatting\RunLogFormatter.cs" />
     <Compile Include="Formatting\SchematicSvgBuilder.cs" />
     <Compile Include="Tests\SchematicSvgBuilderTests.cs" />
+    <Compile Include="Tests\AddonCommandLineTests.cs" />
+    <Compile Include="Tests\AddonEnvironmentTests.cs" />
+    <Compile Include="Tests\AddonLauncherIntegrationTests.cs" />
+    <Compile Include="Tests\AddonScriptTests.cs" />
+    <Compile Include="Tests\AddonValidationTests.cs" />
     <Compile Include="ExchangeObjects\FunctionValue.cs" />
     <Compile Include="ExchangeObjects\InputSetSummary.cs" />
     <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />

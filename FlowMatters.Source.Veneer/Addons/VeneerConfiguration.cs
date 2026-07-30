@@ -88,6 +88,37 @@ namespace FlowMatters.Source.Veneer.Addons
 
         public string scenario { get; set; }
 
+        public string[] args { get; set; }
+
+        public Dictionary<string, string> env { get; set; }
+
+        public string workingDirectory { get; set; }
+
+        public string[] script { get; set; }
+
+        /// <summary>
+        /// Returns null when valid, otherwise a human-readable reason. Used to
+        /// render a disabled menu item with a tooltip rather than silently
+        /// omitting the entry.
+        /// </summary>
+        public static string Validate(VeneerAddon addon)
+        {
+            bool hasScript = addon.script != null && addon.script.Length > 0;
+
+            if (!string.IsNullOrEmpty(addon.path) && addon.script != null)
+                return "specifies both 'path' and 'script'; they are mutually exclusive";
+
+            if (string.Equals(addon.type, "script", StringComparison.OrdinalIgnoreCase) && !hasScript)
+                return "is type 'script' but has no 'script' lines";
+
+            // Without this, an 'exe' addon with no path passes validation and only
+            // fails when the user clicks it. Catching it at menu-build time is the
+            // whole point of rendering a disabled item with an explanatory tooltip.
+            if (!hasScript && string.IsNullOrEmpty(addon.path))
+                return "has neither 'path' nor 'script'; there is nothing to run";
+
+            return null;
+        }
     }
 
     public class VeneerOptions
