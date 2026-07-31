@@ -19,8 +19,6 @@ namespace FlowMatters.Source.Veneer
 {
     internal class VeneerMenu
     {
-        const string DEFAULT_MENU = "Reporting";
-
         private VeneerMenu()
         {
         }
@@ -42,12 +40,18 @@ namespace FlowMatters.Source.Veneer
 
         public WebServerStatusControl Control { get; set; }
 
+        /// <summary>Top-level menus this project requires, in bar order.</summary>
+        private List<string> _menuLayout = new List<string>();
+
+        /// <summary>Menu items Veneer itself added to the main menu strip.</summary>
+        private readonly List<ToolStripMenuItem> _createdMenus = new List<ToolStripMenuItem>();
+
         public static Form FindMainForm()
         {
             return Application.OpenForms.Cast<Form>().FirstOrDefault(f => f.MainMenuStrip != null);
         }
 
-        public ToolStripMenuItem FindOrCreateReportMenu(Form parent,string mnu=DEFAULT_MENU)
+        public ToolStripMenuItem FindOrCreateReportMenu(Form parent,string mnu=MenuLayout.DEFAULT_MENU)
         {
             ToolStripMenuItem result =
                 parent.MainMenuStrip.Items.Cast<ToolStripItem>().Where(item => item.Text == mnu)
@@ -58,25 +62,10 @@ namespace FlowMatters.Source.Veneer
                 result = new ToolStripMenuItem(mnu);
                 result.DropDownOpening += (sender, args) => PopulateReportMenu(mnu);
                 parent.MainMenuStrip.Items.Add(result);
+                _createdMenus.Add(result);
             }
 
             return result;
-        }
-
-        private string[] SplitMenuPath(string menuPath)
-        {
-            if (string.IsNullOrEmpty(menuPath))
-                return new[] { DEFAULT_MENU };
-
-            return menuPath.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => s.Trim())
-                .ToArray();
-        }
-
-        private string GetTopLevelMenu(string menuPath)
-        {
-            var parts = SplitMenuPath(menuPath);
-            return parts.Length > 0 ? parts[0] : DEFAULT_MENU;
         }
 
         private ToolStripMenuItem FindOrCreateNestedMenu(ToolStripMenuItem parentMenu, string[] menuPath, int startIndex = 1)
@@ -106,26 +95,14 @@ namespace FlowMatters.Source.Veneer
 
             if (Scenario != null)
             {
-                string projectFolder = Scenario.Project.FileDirectory;
-                if (projectFolder != null)
-                {
-                    foreach (string reportFn in Directory.EnumerateFiles(projectFolder, "*.htm*",
-                                 SearchOption.TopDirectoryOnly))
-                    {
-                        string fn = reportFn.Replace(projectFolder + "\\", "");
-                        ToolStripItem item = reportMenu.DropDownItems.Add(NiceName(fn));
-                        item.Click += (eventSender, eventArgs) => Launch(fn);
-                    }
-                }
-
                 var config = VeneerConfiguration.Load(Scenario);
                 var currentScenario = MainForm.Instance.CurrentScenario;
                 if (config?.addons != null)
                 {
-                    var addonsForMenu = config.addons.Where(a => GetTopLevelMenu(a.menu) == mnu);
+                    var addonsForMenu = config.addons.Where(a => MenuLayout.TopLevelMenu(a.menu) == mnu);
                     foreach (var addon in addonsForMenu)
                     {
-                        var menuPath = SplitMenuPath(addon.menu);
+                        var menuPath = MenuLayout.SplitMenuPath(addon.menu);
                         ToolStripMenuItem targetMenu = reportMenu;
 
                         if (menuPath.Length > 1)
@@ -176,6 +153,13 @@ namespace FlowMatters.Source.Veneer
                     }
                 }
 
+                // Auto-discovered reports belong to Reporting only, and sit below the
+                // addons that the .veneer file specified explicitly.
+                if (mnu == MenuLayout.DEFAULT_MENU)
+                {
+                    AddHtmlReports(reportMenu);
+                }
+
                 if (config?.options!= null)
                 {
                     WebServerStatusControl.DefaultAllowScripts = config.options.allowScripts;
@@ -185,9 +169,9 @@ namespace FlowMatters.Source.Veneer
                 }
             }
 
-            // Only add Veneer logo to the first menu
-            var requiredMenus = RequiredMenus();
-            if (requiredMenus.Count > 0 && requiredMenus[0] == mnu)
+            // Only add the Veneer logo to the last menu in the layout
+            var layout = _menuLayout.Count > 0 ? _menuLayout : RequiredMenus();
+            if (layout.Count > 0 && layout[layout.Count - 1] == mnu)
             {
                 ToolStripItem veneer = reportMenu.DropDownItems.Add("");
                 veneer.BackgroundImage = Veneer.Properties.Resources.Logo_RGB;
@@ -260,6 +244,16 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
+        private void AddHtmlReports(ToolStripMenuItem reportMenu)
+        {
+            foreach (string reportFn in HtmlReportFiles())
+            {
+                string fn = Path.GetFileName(reportFn);
+                ToolStripItem item = reportMenu.DropDownItems.Add(NiceName(fn));
+                item.Click += (eventSender, eventArgs) => Launch(fn);
+            }
+        }
+
         private string NiceName(string reportFn)
         {
             return reportFn.Replace('_', ' ').Replace(".html", "").Replace(".htm", "");
@@ -277,86 +271,44 @@ namespace FlowMatters.Source.Veneer
             // A project change should re-report addon config problems.
             ClearLoggedProblems();
 
-            Form parent = VeneerMenu.FindMainForm();
-            foreach (var mnu in RequiredMenus())
+            foreach (var menu in _createdMenus)
             {
-                ToolStripMenuItem reportMenu =
-                    parent.MainMenuStrip.Items.Cast<ToolStripItem>().
-                        Where(item => item.Text == mnu).Cast<ToolStripMenuItem>().FirstOrDefault();
-
-                if (reportMenu != null)
-                    parent.MainMenuStrip.Items.Remove(reportMenu);
+                // Owner is the ToolStrip the item currently lives on, so this removes
+                // the item from wherever it actually is rather than from a menu strip
+                // we look up by hand. Only menus Veneer created are ever in this list,
+                // so a .veneer file naming an existing Source menu can no longer make
+                // us delete Source's own menu.
+                if (menu.Owner != null)
+                    menu.Owner.Items.Remove(menu);
             }
+
+            _createdMenus.Clear();
+            _menuLayout.Clear();
         }
 
         public void InitialiseRequiredMenus(Form parent, RiverSystemScenario scenario)
         {
             Scenario = scenario;
-            var menus = RequiredMenus();
-            foreach (var mnu in menus)
+            _menuLayout = RequiredMenus();
+            foreach (var mnu in _menuLayout)
             {
                 FindOrCreateReportMenu(parent, mnu);
             }
         }
+
         private List<string> RequiredMenus()
         {
-            var result = new List<string>();
             var config = VeneerConfiguration.Load(Scenario);
-            
-            // Get all addon menus
-            var addonMenus = new HashSet<string>();
-            if (config?.addons != null)
-            {
-                foreach (var menuPath in config.addons.Select(a => a.menu ?? DEFAULT_MENU))
-                {
-                    addonMenus.Add(GetTopLevelMenu(menuPath));
-                }
-            }
-            
-            // Determine if we have menus other than the default
-            var hasOtherMenus = addonMenus.Any(m => m != DEFAULT_MENU);
-            
-            // Include default menu if it has content OR if there are no other menus
-            if (HasMenuContent(DEFAULT_MENU) || !hasOtherMenus)
-            {
-                result.Add(DEFAULT_MENU);
-            }
-            
-            // Add other addon menus in a consistent order
-            foreach (var menu in addonMenus.OrderBy(m => m))
-            {
-                if (menu != DEFAULT_MENU)
-                {
-                    result.Add(menu);
-                }
-            }
-            
-            return result;
+            return MenuLayout.TopLevelMenus(config?.addons, HtmlReportFiles().Any());
         }
 
-        private bool HasMenuContent(string menuName)
+        private IEnumerable<string> HtmlReportFiles()
         {
-            if (Scenario == null)
-                return false;
-            
-            // Check for HTML reports
-            string projectFolder = Scenario.Project.FileDirectory;
-            if (projectFolder != null)
-            {
-                var htmlFiles = Directory.EnumerateFiles(projectFolder, "*.htm*", SearchOption.TopDirectoryOnly);
-                if (htmlFiles.Any())
-                    return true;
-            }
-            
-            // Check for addons in this menu
-            var config = VeneerConfiguration.Load(Scenario);
-            if (config?.addons != null)
-            {
-                if (config.addons.Any(a => GetTopLevelMenu(a.menu) == menuName))
-                    return true;
-            }
-            
-            return false;
+            var projectFolder = Scenario?.Project?.FileDirectory;
+            if (projectFolder == null)
+                return Enumerable.Empty<string>();
+
+            return Directory.EnumerateFiles(projectFolder, "*.htm*", SearchOption.TopDirectoryOnly);
         }
 
     }
