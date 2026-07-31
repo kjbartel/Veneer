@@ -238,6 +238,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AbstractSourceServer.cs" />
+    <Compile Include="Addons\AddonUrl.cs" />
     <Compile Include="Addons\MenuLayout.cs" />
     <Compile Include="Addons\VeneerConfiguration.cs" />
     <Compile Include="CORS\EnableCrossOriginResourceSharingBehavior.cs" />
@@ -247,6 +248,7 @@
     <Compile Include="DomainActions\AddonEnvironment.cs" />
     <Compile Include="DomainActions\AddonLauncher.cs" />
     <Compile Include="DomainActions\AddonScript.cs" />
+    <Compile Include="DomainActions\ShellLink.cs" />
     <Compile Include="DomainActions\InputSets.cs" />
     <Compile Include="DomainActions\ModelTabulator.cs" />
     <Compile Include="DomainActions\ScenarioInvoker.cs" />
@@ -298,6 +300,7 @@
     <Compile Include="Tests\AddonValidationTests.cs" />
     <Compile Include="Tests\AddonAssert.cs" />
     <Compile Include="Tests\MenuLayoutTests.cs" />
+    <Compile Include="Tests\AddonUrlTests.cs" />
     <Compile Include="ExchangeObjects\FunctionValue.cs" />
     <Compile Include="ExchangeObjects\InputSetSummary.cs" />
     <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />

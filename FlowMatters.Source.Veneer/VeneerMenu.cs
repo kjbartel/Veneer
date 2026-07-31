@@ -128,6 +128,10 @@ namespace FlowMatters.Source.Veneer
                                     item.Click += (o, args) => LaunchAddon(addon);
                                     break;
 
+                                case "url":
+                                    item.Click += (o, args) => LaunchUrlAddon(addon);
+                                    break;
+
                                 // Previously absent, so an unrecognised type silently
                                 // produced a menu item that did nothing when clicked.
                                 default:
@@ -176,7 +180,8 @@ namespace FlowMatters.Source.Veneer
                 ToolStripItem veneer = reportMenu.DropDownItems.Add("");
                 veneer.BackgroundImage = Veneer.Properties.Resources.Logo_RGB;
                 veneer.BackgroundImageLayout = ImageLayout.Zoom;
-                veneer.Click += (eventSender, eventArgs) => Process.Start("http://www.flowmatters.com.au");
+                veneer.Click += (eventSender, eventArgs) =>
+                    OpenLink("http://www.flowmatters.com.au", "the Veneer home page");
             }
         }
 
@@ -200,22 +205,53 @@ namespace FlowMatters.Source.Veneer
 
         private void LaunchAddon(VeneerAddon addon)
         {
+            // Still force-opens the panel, unlike the URL path: this path routes a
+            // child process's stdout and stderr there, so having it open is the point.
             if (Control == null)
             {
                 WebServerStatusControl.Launch();
             }
 
-            var context = new AddonContext
+            AddonLauncher.Launch(addon, BuildAddonContext(), AddonLog());
+        }
+
+        private void LaunchUrlAddon(VeneerAddon addon)
+        {
+            AddonLauncher.LaunchUrl(addon, BuildAddonContext(), AddonLog());
+        }
+
+        private AddonContext BuildAddonContext()
+        {
+            return new AddonContext
             {
-                ProjectDirectory = Scenario.Project.FileDirectory,
-                ProjectFile = Scenario.Project.FullFilename,
+                ProjectDirectory = Scenario?.Project?.FileDirectory,
+                ProjectFile = Scenario?.Project?.FullFilename,
                 // The configured port, not a promise the server is listening --
                 // Port is set independently of Running, and addons may be launched
-                // with the server stopped.
-                Port = Control.Port
+                // with the server stopped. Control is null on the URL path when the
+                // panel was never opened, which that path deliberately does not force.
+                Port = Control != null ? Control.Port : WebServerStatusControl.DefaultPort
             };
+        }
 
-            AddonLauncher.Launch(addon, context, new ControlAddonLog(Control));
+        private IAddonLog AddonLog()
+        {
+            return Control != null ? (IAddonLog)new ControlAddonLog(Control) : new SourceAddonLog();
+        }
+
+        /// <summary>
+        /// Used when the Veneer panel is closed, which the URL path allows --
+        /// opening the panel to show a wiki link would be an odd side effect.
+        /// The URL path emits only errors, so there is no Debug or Warning
+        /// traffic to lose here.
+        /// </summary>
+        private sealed class SourceAddonLog : IAddonLog
+        {
+            public void Write(string message, AddonLogLevel level)
+            {
+                if (level == AddonLogLevel.Error)
+                    TIME.Management.Log.WriteError(this, message);
+            }
         }
 
         /// <summary>
@@ -261,9 +297,29 @@ namespace FlowMatters.Source.Veneer
 
         private void Launch(string p)
         {
-            int port = SourceRESTfulService.DEFAULT_PORT;
+            // Was SourceRESTfulService.DEFAULT_PORT -- the compile-time constant
+            // 9876 -- so report links pointed there no matter where the server
+            // was actually listening.
+            int port = Control != null ? Control.Port : WebServerStatusControl.DefaultPort;
             string url = string.Format("http://localhost:{0}/doc/{1}", port, p);
-            Process.Start(url);
+            OpenLink(url, string.Format("report '{0}'", p));
+        }
+
+        /// <summary>
+        /// Click handlers must not throw -- an escaping exception becomes an
+        /// unhandled-exception dialog in Source. Failures go straight to Source's
+        /// log rather than through LogOnce, which de-duplicates by message and is
+        /// cleared only on project change: right for menu-build spam, wrong for a
+        /// click, where clicking a broken link twice should report twice.
+        /// </summary>
+        private void OpenLink(string url, string description)
+        {
+            string error;
+            if (!ShellLink.TryOpen(url, out error))
+            {
+                TIME.Management.Log.WriteError(
+                    this, string.Format("Veneer could not open {0}: {1}", description, error));
+            }
         }
 
         public void ClearMenu()
